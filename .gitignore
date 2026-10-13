@@ -1,0 +1,51 @@
+# ---------------------------------------------------------
+# SKMC Cold Email - Git exclusions
+# ---------------------------------------------------------
+
+# Secrets / environment
+.env
+.env.*
+*.key
+*.pem
+*.secret
+secrets/
+credentials/
+
+# Database/document backups
+*backup*
+*.bak
+*.bak-*
+*-archived.md
+
+# Generated document outputs
+*.pdf
+*_tmp.html
+*.html
+
+# Local document-generation utilities
+copy_fonts.py
+md2pdf.py
+tools_pdf_check.py
+verify_pdf.py
+
+# Local fonts
+fonts/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
