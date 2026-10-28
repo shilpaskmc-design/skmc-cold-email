@@ -704,38 +704,74 @@ Implements Architecture v1.3 §19/§23:
 
 ```mermaid
 erDiagram
-    COMPANIES ||--o{ LEADS : has
-    LEADS ||--o{ LEAD_ENRICHMENT : enriched_by
-    LEADS ||--o{ VERIFICATION_RESULTS : "append-only history"
+    COMPANIES o|--o{ LEADS : has
+    LEADS ||--o{ LEAD_ENRICHMENT : enrichments
+    LEADS ||--o{ VERIFICATION_RESULTS : verifications
+    COMPANIES {
+        uuid company_id PK
+        text company_name
+        text company_domain UK
+        jsonb profile_json
+        int employee_count
+        text annual_revenue
+        text funding_round
+        text_array tech_stack
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
     LEADS {
         uuid lead_id PK
         text source_system
-        text external_lead_id "source-scoped"
-        citext email "NULL until resolved"
-        jsonb signals "trigger_codes + signals + evidence"
+        text external_lead_id
+        text external_person_id
+        citext email
+        text first_name
+        text last_name
+        text company
+        text title
+        uuid company_id FK
+        text company_domain
+        text linkedin_url
+        text reason
+        jsonb signals
         text signals_schema_version
-        text reason "internal audit only, nullable"
-        text lifecycle_status "14-state enum"
-        text verification_status "current effective"
-        text suppression_status "denormalized fast-gate"
-        text company_domain "enrichment reference only"
-    }
-    COMPANIES {
-        uuid company_id PK
-        text company_domain "enrichment dedupe only"
+        qualification_fit qualification_fit
+        verification_status verification_status
+        lifecycle_status lifecycle_status
+        suppression_status suppression_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     LEAD_ENRICHMENT {
         uuid enrichment_id PK
         uuid lead_id FK
-        boolean skipped "double-buy guard"
+        text provider
+        text_array requested_fields
+        text_array returned_fields
+        jsonb raw_response
+        boolean skipped
+        timestamptz created_at
     }
     VERIFICATION_RESULTS {
         uuid verification_id PK
         uuid lead_id FK
-        text provider "ZEROBOUNCE or MILLIONVERIFIER"
-        text result_status "canonical"
+        verification_provider provider
+        verification_status result_status
+        text provider_status
+        text provider_sub_status
+        boolean catchall_domain
+        boolean mx_found
+        text mx_record
+        text smtp_provider
+        boolean free_email
+        int domain_age_days
+        text did_you_mean
+        boolean is_fallback
         jsonb raw_metadata
-        timestamptz checked_at "freshness source"
+        timestamptz checked_at
+        timestamptz created_at
     }
 ```
 
@@ -743,21 +779,53 @@ erDiagram
 
 ```mermaid
 erDiagram
-    CAMPAIGNS ||--o{ CAMPAIGN_ASSIGNMENTS : assigns
-    LEADS ||--o{ CAMPAIGN_ASSIGNMENTS : "enrolled - re-enrollable"
+    CAMPAIGNS ||--o{ CAMPAIGN_ASSIGNMENTS : assignments
+    LEADS ||--o{ CAMPAIGN_ASSIGNMENTS : enrollments
     CAMPAIGNS {
         uuid campaign_id PK
+        text campaign_name
         text service_line
-        text_array required_fields "eligibility input"
-        text_array signals_template_keys "approved keys - fail closed"
-        text conflict_group "same group = mutually exclusive per contact"
+        text icp_doc_ref
+        text_array required_fields
+        text_array signals_template_keys
+        text conflict_group
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     CAMPAIGN_ASSIGNMENTS {
         uuid assignment_id PK
         uuid lead_id FK
         uuid campaign_id FK
-        boolean active "partial unique per lead+campaign"
-        timestamptz exited_at "history preserved - re-enrollment allowed"
+        timestamptz enrolled_at
+        timestamptz exited_at
+        text exit_reason
+        boolean active
+        timestamptz created_at
+    }
+    LEADS {
+        uuid lead_id PK
+        text source_system
+        text external_lead_id
+        text external_person_id
+        citext email
+        text first_name
+        text last_name
+        text company
+        text title
+        uuid company_id FK
+        text company_domain
+        text linkedin_url
+        text reason
+        jsonb signals
+        text signals_schema_version
+        qualification_fit qualification_fit
+        verification_status verification_status
+        lifecycle_status lifecycle_status
+        suppression_status suppression_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
 ```
 
@@ -765,26 +833,82 @@ erDiagram
 
 ```mermaid
 erDiagram
-    SENDING_DOMAINS ||--o{ MAILBOXES : "pool A..N - no fixed count"
-    MAILBOXES ||--o{ EMAIL_EVENTS : sends
-    CAMPAIGNS ||--o{ EMAIL_EVENTS : attributed
-    LEADS ||--o{ EMAIL_EVENTS : about
+    SENDING_DOMAINS ||--o{ MAILBOXES : owns
+    MAILBOXES o|--o{ EMAIL_EVENTS : sends
+    CAMPAIGNS o|--o{ EMAIL_EVENTS : attribution
+    LEADS o|--o{ EMAIL_EVENTS : subject
     SENDING_DOMAINS {
         uuid domain_id PK
-        text domain_name
-        text health_status
+        text domain_name UK
+        health_status health_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     MAILBOXES {
         uuid mailbox_id PK
         uuid domain_id FK
-        text warmup_status
-        text health_status
+        text email_address UK
+        warmup_status warmup_status
+        timestamptz warmup_started_at
+        timestamptz warmup_completed_at
+        health_status health_status
+        timestamptz paused_at
+        text pause_reason
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     EMAIL_EVENTS {
         uuid event_id PK
-        text idempotency_key UK "primary dedup"
-        text warmbly_event_id "nullable provider id"
-        text event_type "OPEN and CLICK optional"
+        text warmbly_event_id
+        text idempotency_key UK
+        uuid lead_id FK
+        uuid campaign_id FK
+        uuid mailbox_id FK
+        email_event event_type
+        text bounce_type
+        text smtp_diag
+        timestamptz occurred_at
+        jsonb raw_payload
+        timestamptz processed_at
+        timestamptz created_at
+    }
+    CAMPAIGNS {
+        uuid campaign_id PK
+        text campaign_name
+        text service_line
+        text icp_doc_ref
+        text_array required_fields
+        text_array signals_template_keys
+        text conflict_group
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    LEADS {
+        uuid lead_id PK
+        text source_system
+        text external_lead_id
+        text external_person_id
+        citext email
+        text first_name
+        text last_name
+        text company
+        text title
+        uuid company_id FK
+        text company_domain
+        text linkedin_url
+        text reason
+        jsonb signals
+        text signals_schema_version
+        qualification_fit qualification_fit
+        verification_status verification_status
+        lifecycle_status lifecycle_status
+        suppression_status suppression_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
 ```
 
@@ -792,37 +916,109 @@ erDiagram
 
 ```mermaid
 erDiagram
-    LEADS ||--o{ REPLIES : received
-    LEADS ||--o{ SUPPRESSION_LIST : "current state"
-    CAMPAIGNS ||--o{ SUPPRESSION_LIST : "scoped suppression"
-    SUPPRESSION_LIST ||--o{ SUPPRESSION_EVENTS : "append-only history"
-    LEADS ||--o{ LIFECYCLE_EVENTS : "append-only transitions"
+    LEADS ||--o{ REPLIES : receives
+    EMAIL_EVENTS o|--o{ REPLIES : source_event
+    CAMPAIGNS o|--o{ REPLIES : campaign
+    LEADS o|--o{ SUPPRESSION_LIST : lead_reference
+    CAMPAIGNS o|--o{ SUPPRESSION_LIST : scoped_to
+    SUPPRESSION_LIST ||--o{ SUPPRESSION_EVENTS : history
+    LEADS ||--o{ LIFECYCLE_EVENTS : transitions
+    LEADS {
+        uuid lead_id PK
+        text source_system
+        text external_lead_id
+        text external_person_id
+        citext email
+        text first_name
+        text last_name
+        text company
+        text title
+        uuid company_id FK
+        text company_domain
+        text linkedin_url
+        text reason
+        jsonb signals
+        text signals_schema_version
+        qualification_fit qualification_fit
+        verification_status verification_status
+        lifecycle_status lifecycle_status
+        suppression_status suppression_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    REPLIES {
+        uuid reply_id PK
+        uuid event_id FK
+        uuid lead_id FK
+        uuid campaign_id FK
+        reply_class classification
+        text classifier
+        text body_excerpt
+        timestamptz received_at
+        timestamptz created_at
+    }
+    EMAIL_EVENTS {
+        uuid event_id PK
+        text warmbly_event_id
+        text idempotency_key UK
+        uuid lead_id FK
+        uuid campaign_id FK
+        uuid mailbox_id FK
+        email_event event_type
+        text bounce_type
+        text smtp_diag
+        timestamptz occurred_at
+        jsonb raw_payload
+        timestamptz processed_at
+        timestamptz created_at
+    }
     CAMPAIGNS {
         uuid campaign_id PK
+        text campaign_name
         text service_line
-        text_array required_fields "eligibility input"
-        text_array signals_template_keys "approved keys - fail closed"
-        text conflict_group "same group = mutually exclusive per contact"
+        text icp_doc_ref
+        text_array required_fields
+        text_array signals_template_keys
+        text conflict_group
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     SUPPRESSION_LIST {
         uuid suppression_id PK
-        uuid lead_id FK "nullable - pre-lead entries"
-        citext email "canonical lookup key"
-        text scope "GLOBAL or CAMPAIGN discriminator"
-        uuid campaign_id FK "set iff scope CAMPAIGN"
-        text reason "no negative_reply reason"
-        boolean active "current flag - unique per identity"
+        uuid lead_id FK
+        citext email
+        text scope
+        uuid campaign_id FK
+        suppression_reason reason
+        uuid source_event_id
+        boolean active
+        text created_by
+        timestamptz created_at
+        timestamptz updated_at
     }
     SUPPRESSION_EVENTS {
         uuid event_id PK
         uuid suppression_id FK
-        text action "ACTIVATED DEACTIVATED SCOPE_CHANGED REASON_UPDATED"
+        suppression_event_action action
+        text old_scope
+        text new_scope
+        suppression_reason old_reason
+        suppression_reason new_reason
+        text actor
+        uuid source_event_id
         timestamptz occurred_at
     }
     LIFECYCLE_EVENTS {
         uuid event_id PK
-        text from_status "14-state enum only"
-        text to_status
+        uuid lead_id FK
+        lifecycle_status from_status
+        lifecycle_status to_status
+        text reason
+        text triggered_by
+        jsonb metadata
+        timestamptz occurred_at
     }
 ```
 
@@ -830,33 +1026,90 @@ erDiagram
 
 ```mermaid
 erDiagram
-    %% POLICY_CONFIG and CONFIG_HISTORY are logically associated by
-    %% config_key + scope_type + scope_id; NO physical FK exists.
-    %% config_history is an independent immutable audit history.
-    POLICY_CONFIG }|--o{ CONFIG_HISTORY : "audit trail (by key+scope)"
-    LEADS ||--o{ WORKFLOW_RUNS : "optional correlation"
-    LEADS ||--o{ DEAD_LETTER_EVENTS : "optional correlation"
+    POLICY_CONFIG }o..o{ CONFIG_HISTORY : logical_audit_only
+    LEADS o|--o{ WORKFLOW_RUNS : correlation
+    CAMPAIGNS o|--o{ WORKFLOW_RUNS : correlation
+    LEADS o|--o{ DEAD_LETTER_EVENTS : correlation
     POLICY_CONFIG {
         uuid config_id PK
         text config_key
-        text scope_type "GLOBAL DOMAIN MAILBOX CAMPAIGN"
-        uuid scope_id "NULL for GLOBAL"
-        text value "NULL = OPEN DECISION"
+        config_scope scope_type
+        uuid scope_id
+        text value
+        text value_note
+        text updated_by
+        timestamptz updated_at
     }
     CONFIG_HISTORY {
         bigint id PK
+        text config_key
+        config_scope scope_type
+        uuid scope_id
         text old_value
         text new_value
         text changed_by
+        timestamptz changed_at
+        text change_reason
+    }
+    LEADS {
+        uuid lead_id PK
+        text source_system
+        text external_lead_id
+        text external_person_id
+        citext email
+        text first_name
+        text last_name
+        text company
+        text title
+        uuid company_id FK
+        text company_domain
+        text linkedin_url
+        text reason
+        jsonb signals
+        text signals_schema_version
+        qualification_fit qualification_fit
+        verification_status verification_status
+        lifecycle_status lifecycle_status
+        suppression_status suppression_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    CAMPAIGNS {
+        uuid campaign_id PK
+        text campaign_name
+        text service_line
+        text icp_doc_ref
+        text_array required_fields
+        text_array signals_template_keys
+        text conflict_group
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     WORKFLOW_RUNS {
         uuid run_id PK
-        text workflow_name "generic - no fixed numbering"
-        uuid lead_id "optional correlation"
+        text workflow_name
+        text status
+        uuid lead_id FK
+        uuid campaign_id FK
+        text external_ref
+        int items_in
+        int items_out
+        text error
+        timestamptz started_at
+        timestamptz finished_at
     }
     DEAD_LETTER_EVENTS {
         uuid event_id PK
-        text status "OPEN REPLAYED RESOLVED DISCARDED"
+        text workflow
+        text payload_ref
+        text error
+        int attempt_count
+        timestamptz last_attempt_at
+        dlq_status status
+        uuid lead_id FK
+        timestamptz created_at
     }
 ```
 
@@ -864,34 +1117,241 @@ erDiagram
 
 ```mermaid
 erDiagram
-    COMPANIES ||--o{ LEADS : has
-    LEADS ||--o{ LEAD_ENRICHMENT : ""
-    LEADS ||--o{ VERIFICATION_RESULTS : ""
-    LEADS ||--o{ CAMPAIGN_ASSIGNMENTS : ""
-    CAMPAIGNS ||--o{ CAMPAIGN_ASSIGNMENTS : ""
-    LEADS ||--o{ SUPPRESSION_LIST : ""
-    CAMPAIGNS ||--o{ SUPPRESSION_LIST : ""
-    SUPPRESSION_LIST ||--o{ SUPPRESSION_EVENTS : ""
-    LEADS ||--o{ EMAIL_EVENTS : ""
-    MAILBOXES ||--o{ EMAIL_EVENTS : ""
-    SENDING_DOMAINS ||--o{ MAILBOXES : ""
-    EMAIL_EVENTS ||--o{ REPLIES : ""
-    LEADS ||--o{ LIFECYCLE_EVENTS : ""
-    LEADS ||--o{ WORKFLOW_RUNS : ""
-    LEADS ||--o{ DEAD_LETTER_EVENTS : ""
-    POLICY_CONFIG }|--o{ CONFIG_HISTORY : "audit trail (by key+scope)"
+    COMPANIES o|--o{ LEADS : has
+    LEADS ||--o{ LEAD_ENRICHMENT : enrichment
+    LEADS ||--o{ VERIFICATION_RESULTS : verification
+    LEADS ||--o{ CAMPAIGN_ASSIGNMENTS : enrollment
+    CAMPAIGNS ||--o{ CAMPAIGN_ASSIGNMENTS : assigned
+    LEADS o|--o{ SUPPRESSION_LIST : trace
+    CAMPAIGNS o|--o{ SUPPRESSION_LIST : scope
+    SUPPRESSION_LIST ||--o{ SUPPRESSION_EVENTS : history
+    LEADS o|--o{ EMAIL_EVENTS : subject
+    CAMPAIGNS o|--o{ EMAIL_EVENTS : attribution
+    MAILBOXES o|--o{ EMAIL_EVENTS : sends
+    SENDING_DOMAINS ||--o{ MAILBOXES : owns
+    EMAIL_EVENTS o|--o{ REPLIES : source
+    LEADS ||--o{ REPLIES : received
+    CAMPAIGNS o|--o{ REPLIES : campaign
+    LEADS ||--o{ LIFECYCLE_EVENTS : lifecycle
+    LEADS o|--o{ WORKFLOW_RUNS : correlation
+    CAMPAIGNS o|--o{ WORKFLOW_RUNS : correlation
+    LEADS o|--o{ DEAD_LETTER_EVENTS : correlation
+    POLICY_CONFIG }o..o{ CONFIG_HISTORY : logical_audit_only
+    SENDING_DOMAINS {
+        uuid domain_id PK
+        text domain_name UK
+        health_status health_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    MAILBOXES {
+        uuid mailbox_id PK
+        uuid domain_id FK
+        text email_address UK
+        warmup_status warmup_status
+        timestamptz warmup_started_at
+        timestamptz warmup_completed_at
+        health_status health_status
+        timestamptz paused_at
+        text pause_reason
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    COMPANIES {
+        uuid company_id PK
+        text company_name
+        text company_domain UK
+        jsonb profile_json
+        int employee_count
+        text annual_revenue
+        text funding_round
+        text_array tech_stack
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
     LEADS {
         uuid lead_id PK
-        citext email "nullable"
+        text source_system
+        text external_lead_id
+        text external_person_id
+        citext email
+        text first_name
+        text last_name
+        text company
+        text title
+        uuid company_id FK
+        text company_domain
+        text linkedin_url
+        text reason
+        jsonb signals
+        text signals_schema_version
+        qualification_fit qualification_fit
+        verification_status verification_status
+        lifecycle_status lifecycle_status
+        suppression_status suppression_status
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    LEAD_ENRICHMENT {
+        uuid enrichment_id PK
+        uuid lead_id FK
+        text provider
+        text_array requested_fields
+        text_array returned_fields
+        jsonb raw_response
+        boolean skipped
+        timestamptz created_at
+    }
+    VERIFICATION_RESULTS {
+        uuid verification_id PK
+        uuid lead_id FK
+        verification_provider provider
+        verification_status result_status
+        text provider_status
+        text provider_sub_status
+        boolean catchall_domain
+        boolean mx_found
+        text mx_record
+        text smtp_provider
+        boolean free_email
+        int domain_age_days
+        text did_you_mean
+        boolean is_fallback
+        jsonb raw_metadata
+        timestamptz checked_at
+        timestamptz created_at
+    }
+    CAMPAIGNS {
+        uuid campaign_id PK
+        text campaign_name
+        text service_line
+        text icp_doc_ref
+        text_array required_fields
+        text_array signals_template_keys
+        text conflict_group
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     CAMPAIGN_ASSIGNMENTS {
+        uuid assignment_id PK
         uuid lead_id FK
         uuid campaign_id FK
+        timestamptz enrolled_at
+        timestamptz exited_at
+        text exit_reason
         boolean active
+        timestamptz created_at
     }
     SUPPRESSION_LIST {
+        uuid suppression_id PK
+        uuid lead_id FK
+        citext email
+        text scope
         uuid campaign_id FK
+        suppression_reason reason
+        uuid source_event_id
         boolean active
+        text created_by
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    SUPPRESSION_EVENTS {
+        uuid event_id PK
+        uuid suppression_id FK
+        suppression_event_action action
+        text old_scope
+        text new_scope
+        suppression_reason old_reason
+        suppression_reason new_reason
+        text actor
+        uuid source_event_id
+        timestamptz occurred_at
+    }
+    EMAIL_EVENTS {
+        uuid event_id PK
+        text warmbly_event_id
+        text idempotency_key UK
+        uuid lead_id FK
+        uuid campaign_id FK
+        uuid mailbox_id FK
+        email_event event_type
+        text bounce_type
+        text smtp_diag
+        timestamptz occurred_at
+        jsonb raw_payload
+        timestamptz processed_at
+        timestamptz created_at
+    }
+    REPLIES {
+        uuid reply_id PK
+        uuid event_id FK
+        uuid lead_id FK
+        uuid campaign_id FK
+        reply_class classification
+        text classifier
+        text body_excerpt
+        timestamptz received_at
+        timestamptz created_at
+    }
+    LIFECYCLE_EVENTS {
+        uuid event_id PK
+        uuid lead_id FK
+        lifecycle_status from_status
+        lifecycle_status to_status
+        text reason
+        text triggered_by
+        jsonb metadata
+        timestamptz occurred_at
+    }
+    POLICY_CONFIG {
+        uuid config_id PK
+        text config_key
+        config_scope scope_type
+        uuid scope_id
+        text value
+        text value_note
+        text updated_by
+        timestamptz updated_at
+    }
+    CONFIG_HISTORY {
+        bigint id PK
+        text config_key
+        config_scope scope_type
+        uuid scope_id
+        text old_value
+        text new_value
+        text changed_by
+        timestamptz changed_at
+        text change_reason
+    }
+    WORKFLOW_RUNS {
+        uuid run_id PK
+        text workflow_name
+        text status
+        uuid lead_id FK
+        uuid campaign_id FK
+        text external_ref
+        int items_in
+        int items_out
+        text error
+        timestamptz started_at
+        timestamptz finished_at
+    }
+    DEAD_LETTER_EVENTS {
+        uuid event_id PK
+        text workflow
+        text payload_ref
+        text error
+        int attempt_count
+        timestamptz last_attempt_at
+        dlq_status status
+        uuid lead_id FK
+        timestamptz created_at
     }
 ```
 
