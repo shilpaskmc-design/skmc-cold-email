@@ -1,6 +1,6 @@
 # SKMC Cold Email Automation — Database Schema / Lead Data Model
 
-**Version:** 1.2 | **Date:** 2026-10-13 | **Status:** Approved — Database implementation of Architecture v1.3
+**Version:** 1.3 | **Date:** 2026-10-13 | **Status:** Approved — Database implementation of Architecture v1.3
 
 **Governing architecture:** `/opt/data/skmc-cold-email/docs/architecture.md` — Version 1.3 — Approved — Single Source of Truth.
 
